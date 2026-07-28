@@ -46,7 +46,7 @@ if _ADMIN_IDS_ENV:
     ADMIN_IDS = [int(x.strip()) for x in _ADMIN_IDS_ENV.split(",") if x.strip()]
 else:
     ADMIN_IDS = [6786975675765675]
-SUPPORT_USER = "@SSOLTAAANNN"
+SUPPORT_USER = "@goldenboy95a"
 
 # إعدادات الأداء
 MAX_WORKERS = 50
