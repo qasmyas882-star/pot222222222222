@@ -74,7 +74,8 @@ CREATE TABLE IF NOT EXISTS events_af (
     event_name TEXT,
     display_name TEXT,
     event_type TEXT,
-    is_purchase INTEGER DEFAULT 0
+    is_purchase INTEGER DEFAULT 0,
+    custom_event_value TEXT
 );
 
 CREATE TABLE IF NOT EXISTS events_singular (

@@ -179,8 +179,13 @@ c_main.execute('''CREATE TABLE IF NOT EXISTS events_af (
     event_name TEXT,
     display_name TEXT,
     event_type TEXT,
-    is_purchase INTEGER DEFAULT 0
+    is_purchase INTEGER DEFAULT 0,
+    custom_event_value TEXT
 )''')
+try:
+    c_main.execute("ALTER TABLE events_af ADD COLUMN custom_event_value TEXT")
+except Exception:
+    pass
 
 c_main.execute('''CREATE TABLE IF NOT EXISTS events_singular (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -418,6 +423,7 @@ AF_GAMES = [
     ("goodville", "🏡 Goodville", "com.goodville.goodgame", "MqrvZSKujKBZ4byRDHm5a4", "🏡"),
     ("game_of_vampires", "🧛 Game of Vampires", "com.mechanist.vampire.aos", "ZCD7jvH8i9zt9ewanppetD", "🧛"),
     ("UltimateHoldem", "🃏 Ultimate Hold'em", "com.kamagames.ultimpoker", "YbczyDZZmXbxwpYYyJgqTQ", "🃏"),
+    ("merge_sweet", "🍬 Merge Sweet", "com.spcomes.emerge", "HMXC9vJHx8vdtvJEvP6HNg", "🍬"),
 ]
 
 for game in AF_GAMES:
@@ -567,6 +573,14 @@ def add_af_events():
                        (bj[0], "15level", "🃏 Level 15", "level", 0))
         c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)", 
                        (bj[0], "5levelup", "🃏 Level 5", "level", 0))
+
+    # Merge Sweet
+    ms = c_main.execute("SELECT id FROM games_af WHERE name = 'merge_sweet'").fetchone()
+    if ms:
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase, custom_event_value) VALUES (?, ?, ?, ?, ?, ?)",
+                       (ms[0], "player_lv_02", "🏆 Player Level 2", "level", 0, None))
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase, custom_event_value) VALUES (?, ?, ?, ?, ?, ?)",
+                       (ms[0], "oder_complete", "📦 Order Complete", "order", 0, '{"1-1-7":"1"}'))
         
 add_af_events()
 
@@ -1344,7 +1358,7 @@ async def send_farm_notification(context: ContextTypes.DEFAULT_TYPE, user_id: in
 # ==================================================================================
 executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
-def send_af(pkg: str, dev_key: str, gaid: str, af_uid: str, event_name: str, revenue: float = None, proxy: Dict = None, platform: str = "android", idfa: str = None, idfv: str = None, custom_level: str = None) -> Tuple[int, str]:
+def send_af(pkg: str, dev_key: str, gaid: str, af_uid: str, event_name: str, revenue: float = None, proxy: Dict = None, platform: str = "android", idfa: str = None, idfv: str = None, custom_level: str = None, custom_event_value: Dict = None) -> Tuple[int, str]:
     import random
     import uuid
     import time
@@ -1422,6 +1436,9 @@ def send_af(pkg: str, dev_key: str, gaid: str, af_uid: str, event_name: str, rev
                 "af_score": str(random.randint(1000, 50000)),
                 "af_duration": str(random.randint(30, 300))
             }
+
+    if custom_event_value:
+        payload["eventValue"] = custom_event_value
     
     # ========== الهيدرز (صيغة Android دائمًا) ==========
     headers = {
@@ -3857,7 +3874,16 @@ async def af_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("af_send_"):
         event = data.replace("af_send_", "")
         await query.edit_message_text("📤 *جاري الإرسال...*", parse_mode="Markdown")
-        status, resp = send_af(pkg, dev_key, gaid, af_uid, event, None, proxy, platform, idfa, idfv)
+        custom_ev_value = None
+        af_game_id = context.user_data.get("af_game_id")
+        if af_game_id:
+            cv_row = c_main.execute("SELECT custom_event_value FROM events_af WHERE game_id = ? AND event_name = ?", (af_game_id, event)).fetchone()
+            if cv_row and cv_row[0]:
+                try:
+                    custom_ev_value = json.loads(cv_row[0])
+                except Exception:
+                    custom_ev_value = None
+        status, resp = send_af(pkg, dev_key, gaid, af_uid, event, None, proxy, platform, idfa, idfv, custom_event_value=custom_ev_value)
     else:
         await query.edit_message_text("❌ *حدث خطأ*", parse_mode="Markdown")
         return -1
@@ -6138,12 +6164,18 @@ async def run_sched_group_loop(bot, group_id: int, user_id: int):
                         else:
                             sc, rs = await loop.run_in_executor(None, lambda e=ev_row[0]: send_singular(e, gaid, af_uid, game_pkg, game_key, proxy=proxy))
                 else:
-                    ev_row = c_main.execute("SELECT event_name FROM events_af WHERE id = ?", (ev_id,)).fetchone()
+                    ev_row = c_main.execute("SELECT event_name, custom_event_value FROM events_af WHERE id = ?", (ev_id,)).fetchone()
                     if ev_row:
+                        _ev_val = None
+                        if ev_row[1]:
+                            try:
+                                _ev_val = json.loads(ev_row[1])
+                            except Exception:
+                                _ev_val = None
                         if sched_is_ios:
-                            sc, rs = await loop.run_in_executor(None, lambda e=ev_row[0]: send_af(game_pkg, game_key, None, af_uid, e, proxy=proxy, platform="ios", idfa=idfa, idfv=idfv))
+                            sc, rs = await loop.run_in_executor(None, lambda e=ev_row[0], v=_ev_val: send_af(game_pkg, game_key, None, af_uid, e, proxy=proxy, platform="ios", idfa=idfa, idfv=idfv, custom_event_value=v))
                         else:
-                            sc, rs = await loop.run_in_executor(None, lambda e=ev_row[0]: send_af(game_pkg, game_key, gaid, af_uid, e, proxy=proxy))
+                            sc, rs = await loop.run_in_executor(None, lambda e=ev_row[0], v=_ev_val: send_af(game_pkg, game_key, gaid, af_uid, e, proxy=proxy, custom_event_value=v))
         except Exception as ex:
             sc, rs = 0, str(ex)
         return sc, rs

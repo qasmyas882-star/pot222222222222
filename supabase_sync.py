@@ -215,10 +215,10 @@ def sync_game_singular(game_id, name, display_name, package, app_key, emoji):
          ["id"])
 
 
-def sync_event_af(event_id, game_id, event_name, display_name, event_type, is_purchase):
+def sync_event_af(event_id, game_id, event_name, display_name, event_type, is_purchase, custom_event_value=None):
     _run(_upsert, "events_af",
-         ["id", "game_id", "event_name", "display_name", "event_type", "is_purchase"],
-         [event_id, game_id, event_name, display_name, event_type, is_purchase],
+         ["id", "game_id", "event_name", "display_name", "event_type", "is_purchase", "custom_event_value"],
+         [event_id, game_id, event_name, display_name, event_type, is_purchase, custom_event_value],
          ["id"])
 
 
@@ -332,10 +332,10 @@ def restore_all(sqlite_conn):
     restored += len(rows)
 
     # 5) الأحداث (af)
-    rows = _fetch_all("events_af", ["id", "game_id", "event_name", "display_name", "event_type", "is_purchase"])
+    rows = _fetch_all("events_af", ["id", "game_id", "event_name", "display_name", "event_type", "is_purchase", "custom_event_value"])
     for r in rows:
         cur.execute(
-            "INSERT OR IGNORE INTO events_af (id, game_id, event_name, display_name, event_type, is_purchase) VALUES (?,?,?,?,?,?)",
+            "INSERT OR IGNORE INTO events_af (id, game_id, event_name, display_name, event_type, is_purchase, custom_event_value) VALUES (?,?,?,?,?,?,?)",
             r
         )
     restored += len(rows)
