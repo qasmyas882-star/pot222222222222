@@ -424,6 +424,8 @@ AF_GAMES = [
     ("game_of_vampires", "🧛 Game of Vampires", "com.mechanist.vampire.aos", "ZCD7jvH8i9zt9ewanppetD", "🧛"),
     ("UltimateHoldem", "🃏 Ultimate Hold'em", "com.kamagames.ultimpoker", "YbczyDZZmXbxwpYYyJgqTQ", "🃏"),
     ("merge_sweet", "🍬 Merge Sweet", "com.spcomes.emerge", "HMXC9vJHx8vdtvJEvP6HNg", "🍬"),
+    ("cook_and_merge", "🍳 Cook & Merge", "com.supersolid.cookandmerge", "MwuH4qacNh9VfTrTBZVjMJ", "🍳"),
+    ("match_factory", "🏭 Match Factory", "net.peakgames.match", "F9M4SkdtH8WHcAt86ESrF3", "🏭"),
 ]
 
 for game in AF_GAMES:
@@ -581,7 +583,25 @@ def add_af_events():
                        (ms[0], "player_lv_02", "🏆 Player Level 2", "level", 0, None))
         c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase, custom_event_value) VALUES (?, ?, ?, ?, ?, ?)",
                        (ms[0], "oder_complete", "📦 Order Complete", "order", 0, '{"1-1-7":"1"}'))
-        
+
+    # Cook & Merge
+    cm2 = c_main.execute("SELECT id FROM games_af WHERE name = 'cook_and_merge'").fetchone()
+    if cm2:
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)",
+                       (cm2[0], "levelup100", "🏆 Level Up 100", "level", 0))
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)",
+                       (cm2[0], "af_tutorial_completion", "🎓 Tutorial Completion", "tutorial", 0))
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)",
+                       (cm2[0], "unlock_loyalty_card_event", "💳 Unlock Loyalty Card", "unlock", 0))
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)",
+                       (cm2[0], "af_level_achieved", "🏆 Level Achieved", "level", 0))
+
+    # Match Factory
+    mf = c_main.execute("SELECT id FROM games_af WHERE name = 'match_factory'").fetchone()
+    if mf:
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)",
+                       (mf[0], "d1_retention", "📅 D1 Retention", "retention", 0))
+
 add_af_events()
 
 # ==================== ألعاب Singular ====================
