@@ -419,13 +419,14 @@ AF_GAMES = [
     ("Coin_Master_Board_Adventure", "⚔️ Coin Master - Board Adventure", "com.moonactive.cmboard", "H3KjoCRVTiVgA5mWSAHtCe", "⚔️"),
     ("royal_farm", "🚜 Royal Farm", "com.ugo.play.free.farm.valley", "ktoVPgaiGM9AZhM5BFycVB", "🚜"),
     ("idle_zombie_miner", "🧟 Idle Zombie Miner", "com.zombie.idleminertycoon", "Ko6tMi9uqZbPBgJsKCuAUd", "🧟"),
-    ("travel_town", "✈️ Travel Town", "io.randomco.travel", "wizhvjciCuaDbAaR8KpZLn", "✈️"),
+    ("travel_town", "✈️ Travel Town", "com.magmatic.traveltown", "wizhvjciCuaDbAaR8KpZLn", "✈️"),
     ("goodville", "🏡 Goodville", "com.goodville.goodgame", "MqrvZSKujKBZ4byRDHm5a4", "🏡"),
     ("game_of_vampires", "🧛 Game of Vampires", "com.mechanist.vampire.aos", "ZCD7jvH8i9zt9ewanppetD", "🧛"),
     ("UltimateHoldem", "🃏 Ultimate Hold'em", "com.kamagames.ultimpoker", "YbczyDZZmXbxwpYYyJgqTQ", "🃏"),
     ("merge_sweet", "🍬 Merge Sweet", "com.spcomes.emerge", "HMXC9vJHx8vdtvJEvP6HNg", "🍬"),
     ("cook_and_merge", "🍳 Cook & Merge", "com.supersolid.cookandmerge", "MwuH4qacNh9VfTrTBZVjMJ", "🍳"),
     ("match_factory", "🏭 Match Factory", "net.peakgames.match", "F9M4SkdtH8WHcAt86ESrF3", "🏭"),
+    ("phase_10", "🎴 Phase 10", "com.mattel163.phase10", "qCWrc7L2pa8SbLEvonfmja", "🎴"),
 ]
 
 for game in AF_GAMES:
@@ -553,6 +554,8 @@ def add_af_events():
     if tt:
         c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)", 
                        (tt[0], "level_completed_1", "🏆 Level 1", "level", 0))
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)",
+                       (tt[0], "reachedLevel2", "🏆 Level 2", "level", 0))
 
     # Goodville
     gv = c_main.execute("SELECT id FROM games_af WHERE name = 'goodville'").fetchone()
@@ -601,6 +604,12 @@ def add_af_events():
     if mf:
         c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)",
                        (mf[0], "d1_retention", "📅 D1 Retention", "retention", 0))
+
+    # Phase 10
+    p10 = c_main.execute("SELECT id FROM games_af WHERE name = 'phase_10'").fetchone()
+    if p10:
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)",
+                       (p10[0], "af_finish_phase", "🎴 Finish Phase", "phase", 0))
 
 add_af_events()
 
