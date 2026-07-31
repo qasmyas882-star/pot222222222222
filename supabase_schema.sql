@@ -78,6 +78,20 @@ CREATE TABLE IF NOT EXISTS events_af (
     custom_event_value TEXT
 );
 
+-- ==================================================================================
+-- أحداث المناطق الديناميكية (area_{X}_completed) — Cook & Merge
+-- ==================================================================================
+-- يدعم جدول events_af أعلاه صيغة الحدث الديناميكي area_{X}_completed بدون أي
+-- تغيير في البنية: event_name يخزّن الاسم الكامل (مثل area_1_completed،
+-- area_10_completed) و event_type = 'area' و is_purchase = 0.
+-- لا تُحفظ أرقام مناطق ثابتة (Hardcoded) — ينشئ المستخدم أي رقم منطقة عبر
+-- زر "🗺️ منطقة مخصصة" في البوت، ويُسجَّل الحدث تلقائياً (INSERT OR IGNORE) ويُزامَن
+-- مع Supabase عبر supabase_sync.sync_dynamic_area_event_af(event_id, game_id, area_number)
+-- ويُستعاد بعد إعادة النشر ضمن استعادة events_af في restore_all().
+-- الأحداث الثابتة لـ Cook & Merge (com.supersolid.cookandmerge) تبقى محفوظة:
+-- af_session_5, levelup100, af_tutorial_completion, unlock_loyalty_card_event, af_level_achieved.
+-- ==================================================================================
+
 CREATE TABLE IF NOT EXISTS events_singular (
     id BIGINT PRIMARY KEY,
     game_id BIGINT,

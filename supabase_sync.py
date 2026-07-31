@@ -236,6 +236,21 @@ def sync_event_adj(event_id, game_id, event_name, event_token, display_name, lev
          ["id"])
 
 
+def sync_dynamic_area_event_af(event_id, game_id, area_number):
+    """يزامن حدث منطقة ديناميكي (area_{X}_completed) مع Supabase.
+
+    لا تُحفظ أرقام مناطق ثابتة — يُنشأ الحدث عند إدخال المستخدم لأي رقم منطقة
+    (مثال: area_1_completed, area_10_completed, ...) ويُسجَّل في events_af
+    حتى يُستعاد بعد إعادة النشر ويظهر في قائمة الأحداث مستقبلاً.
+    """
+    event_name = f"area_{area_number}_completed"
+    display_name = f"🗺️ Area {area_number}"
+    _run(_upsert, "events_af",
+         ["id", "game_id", "event_name", "display_name", "event_type", "is_purchase", "custom_event_value"],
+         [event_id, game_id, event_name, display_name, "area", 0, None],
+         ["id"])
+
+
 # ==================== مجموعات الجدولة ====================
 
 def sync_sched_group(group_row: dict):

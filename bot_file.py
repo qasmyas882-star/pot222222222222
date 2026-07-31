@@ -587,9 +587,13 @@ def add_af_events():
         c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase, custom_event_value) VALUES (?, ?, ?, ?, ?, ?)",
                        (ms[0], "oder_complete", "📦 Order Complete", "order", 0, '{"1-1-7":"1"}'))
 
-    # Cook & Merge
+    # Cook & Merge (com.supersolid.cookandmerge)
+    # الأحداث الثابتة محفوظة كما هي. أحداث المناطق (area_{X}_completed) تُنشأ
+    # ديناميكياً من قبل المستخدم عبر زر "🗺️ منطقة مخصصة" ولا تُحفظ أرقام ثابتة هنا.
     cm2 = c_main.execute("SELECT id FROM games_af WHERE name = 'cook_and_merge'").fetchone()
     if cm2:
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)",
+                       (cm2[0], "af_session_5", "🔢 Session 5", "session", 0))
         c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)",
                        (cm2[0], "levelup100", "🏆 Level Up 100", "level", 0))
         c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)",
@@ -3801,6 +3805,11 @@ async def af_level(update: Update, context: ContextTypes.DEFAULT_TYPE):
         kb.append([InlineKeyboardButton(ev[2], callback_data=f"af_send_{ev[1]}")])
     # زر لفل مخصص يتيح للزبون إدخال رقم لفل يدوياً (45، 46، إلخ)
     kb.append([InlineKeyboardButton("✨ لفل مخصص", callback_data="af_custom")])
+    # زر منطقة مخصصة (area_{X}_completed) — متاح فقط لـ Cook & Merge
+    # يتيح للزبون إدخال أي رقم منطقة دون تثبيت أرقام مسبقة
+    game_row = c_main.execute("SELECT name FROM games_af WHERE id = ?", (game_id,)).fetchone()
+    if game_row and game_row[0] == "cook_and_merge":
+        kb.append([InlineKeyboardButton("🗺️ منطقة مخصصة", callback_data="af_custom_area")])
     kb.append([InlineKeyboardButton("🔙 رجوع", callback_data="af_back")])
     
     await query.edit_message_text(
@@ -4019,6 +4028,106 @@ async def af_custom_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
             event = f"af_level_{custom_level}_achieved"
     else:
         event = f"af_level_{custom_level}_achieved"
+    await query.edit_message_text("📤 *جاري الإرسال...*", parse_mode="Markdown")
+    status, resp = send_af(pkg, dev_key, gaid, af_uid, event, None, proxy, platform, idfa, idfv)
+    increment_user_requests(uid)
+    if status == 200:
+        result = "✅ *تم الإرسال بنجاح!*"
+    else:
+        result = f"❌ *فشل الإرسال* (HTTP {status})"
+    kb = [[InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="main")]]
+    await query.message.reply_text(result, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
+    return -1
+
+# ==================================================================================
+#                  منطقة مخصصة ديناميكية (area_{X}_completed) — Cook & Merge
+# ==================================================================================
+async def af_custom_area(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "🗺️ *منطقة مخصصة*\n\n"
+        "أدخل رقم المنطقة المطلوب (مثال: 1 أو 10):\n"
+        "سيتم إرسال الحدث بصيغة `area_{X}_completed`",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 إلغاء", callback_data="af_level")]
+        ])
+    )
+    return "AF_CUSTOM_AREA"
+
+async def af_custom_area_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    digits = ''.join(filter(str.isdigit, text))
+    if not digits:
+        await update.message.reply_text(
+            "❌ الرجاء إدخال رقم صحيح للمنطقة (مثال: 1 أو 10)",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 إلغاء", callback_data="af_level")]
+            ])
+        )
+        return "AF_CUSTOM_AREA"
+    context.user_data["af_custom_area"] = digits
+    await update.message.reply_text(
+        f"✅ *تأكيد المنطقة المخصصة*\n\n"
+        f"رقم المنطقة: *{digits}*\n"
+        f"اسم الحدث: `area_{digits}_completed`\n\n"
+        f"هل تريد إرسال الحدث؟",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ تأكيد وإرسال", callback_data="af_custom_area_confirm")],
+            [InlineKeyboardButton("🔙 إلغاء", callback_data="af_level")]
+        ])
+    )
+    return "AF_CUSTOM_AREA_CONFIRM"
+
+async def af_custom_area_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    uid = query.from_user.id
+    area_num = context.user_data.get("af_custom_area")
+    if not area_num:
+        await query.edit_message_text("❌ انتهت الجلسة، الرجاء المحاولة من جديد.")
+        return -1
+    pkg = context.user_data.get("af_pkg")
+    dev_key = context.user_data.get("af_dev_key")
+    game_id = context.user_data.get("af_game_id")
+    if not pkg or not dev_key:
+        await query.edit_message_text(
+            "❌ *خطأ: لم يتم اختيار لعبة بعد!*\n\nالرجاء العودة إلى القائمة واختيار لعبة أولاً.",
+            parse_mode="Markdown"
+        )
+        await af_show_games(update, context)
+        return -1
+    # بناء اسم الحدث الديناميكي بصيغة area_{X}_completed
+    event = f"area_{area_num}_completed"
+    # تسجيل الحدث الديناميكي محلياً ومزامنته مع Supabase (INSERT OR IGNORE)
+    # حتى يظهر في قائمة الأحداث مستقبلاً ويُستعاد بعد إعادة النشر
+    if game_id:
+        c_main.execute(
+            "INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)",
+            (game_id, event, f"🗺️ Area {area_num}", "area", 0)
+        )
+        conn_main.commit()
+        new_id_row = c_main.execute(
+            "SELECT id FROM events_af WHERE game_id = ? AND event_name = ? ORDER BY id DESC LIMIT 1",
+            (game_id, event)
+        ).fetchone()
+        if new_id_row:
+            supabase_sync.sync_dynamic_area_event_af(new_id_row[0], game_id, area_num)
+        cache_clear(f"af_events_{game_id}")
+    platform = get_user_platform(uid)
+    proxy = get_proxy_for_user(uid)
+    if platform == "ios":
+        gaid = None
+        af_uid = context.user_data.get("af_uid")
+        idfa = context.user_data.get("af_idfa")
+        idfv = context.user_data.get("af_idfv")
+    else:
+        gaid = context.user_data.get("af_gaid")
+        af_uid = context.user_data.get("af_uid")
+        idfa = None
+        idfv = None
     await query.edit_message_text("📤 *جاري الإرسال...*", parse_mode="Markdown")
     status, resp = send_af(pkg, dev_key, gaid, af_uid, event, None, proxy, platform, idfa, idfv)
     increment_user_requests(uid)
@@ -7184,9 +7293,11 @@ def main():
             "AF_UID": [MessageHandler(filters.TEXT & ~filters.COMMAND, af_uid_ios), MessageHandler(filters.TEXT & ~filters.COMMAND, af_uid)],
             "AF_GAID": [MessageHandler(filters.TEXT & ~filters.COMMAND, af_gaid), CallbackQueryHandler(credfile_select, pattern=r"^credfile_af_\d+$")],
             "AF_TYPE": [CallbackQueryHandler(af_level, pattern="^af_level$"), CallbackQueryHandler(af_purchase, pattern="^af_purchase$"), CallbackQueryHandler(af_back, pattern="^af_back$")],
-            "AF_SEND": [CallbackQueryHandler(af_send, pattern="^af_send_|^af_pay_"), CallbackQueryHandler(af_back, pattern="^af_back$"), CallbackQueryHandler(af_custom, pattern="^af_custom$")],
+            "AF_SEND": [CallbackQueryHandler(af_send, pattern="^af_send_|^af_pay_"), CallbackQueryHandler(af_back, pattern="^af_back$"), CallbackQueryHandler(af_custom, pattern="^af_custom$"), CallbackQueryHandler(af_custom_area, pattern="^af_custom_area$")],
             "AF_CUSTOM": [MessageHandler(filters.TEXT & ~filters.COMMAND, af_custom_value), CallbackQueryHandler(af_level, pattern="^af_level$")],
             "AF_CUSTOM_CONFIRM": [CallbackQueryHandler(af_custom_confirm, pattern="^af_custom_confirm$"), CallbackQueryHandler(af_level, pattern="^af_level$")],
+            "AF_CUSTOM_AREA": [MessageHandler(filters.TEXT & ~filters.COMMAND, af_custom_area_value), CallbackQueryHandler(af_level, pattern="^af_level$")],
+            "AF_CUSTOM_AREA_CONFIRM": [CallbackQueryHandler(af_custom_area_confirm, pattern="^af_custom_area_confirm$"), CallbackQueryHandler(af_level, pattern="^af_level$")],
         },
         fallbacks=[], allow_reentry=True
     )
