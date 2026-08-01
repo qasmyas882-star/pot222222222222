@@ -5637,13 +5637,20 @@ async def del_game_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if gtype == "af":
         c_main.execute("DELETE FROM events_af WHERE game_id = ?", (game_id,))
         c_main.execute("DELETE FROM games_af WHERE id = ?", (game_id,))
+        supabase_sync.sync_events_af_by_game_delete(game_id)
+        supabase_sync.sync_game_af_delete(game_id)
     elif gtype == "adj":
         c_main.execute("DELETE FROM events_adj WHERE game_id = ?", (game_id,))
         c_main.execute("DELETE FROM games_adj WHERE id = ?", (game_id,))
+        supabase_sync.sync_events_adj_by_game_delete(game_id)
+        supabase_sync.sync_game_adj_delete(game_id)
     else:
         c_main.execute("DELETE FROM events_singular WHERE game_id = ?", (game_id,))
         c_main.execute("DELETE FROM games_singular WHERE id = ?", (game_id,))
+        supabase_sync.sync_events_singular_by_game_delete(game_id)
+        supabase_sync.sync_game_singular_delete(game_id)
     conn_main.commit()
+    cache_clear()
     await query.edit_message_text("✅ *تم حذف اللعبة*", parse_mode="Markdown")
     kb = [[InlineKeyboardButton("🔙 رجوع", callback_data="admin")]]
     await query.message.reply_text("العودة:", reply_markup=InlineKeyboardMarkup(kb))
@@ -5871,10 +5878,13 @@ async def del_event_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if gtype == "af":
         c_main.execute("DELETE FROM events_af WHERE id = ?", (event_id,))
+        supabase_sync.sync_event_af_delete(event_id)
     elif gtype == "adj":
         c_main.execute("DELETE FROM events_adj WHERE id = ?", (event_id,))
+        supabase_sync.sync_event_adj_delete(event_id)
     else:
         c_main.execute("DELETE FROM events_singular WHERE id = ?", (event_id,))
+        supabase_sync.sync_event_singular_delete(event_id)
     conn_main.commit()
     cache_clear()
     await query.edit_message_text("✅ *تم حذف الحدث*", parse_mode="Markdown")
@@ -7285,6 +7295,13 @@ def main():
         print("✅ تم استعادة البيانات من Supabase")
     except Exception as e:
         print(f"⚠️ تعذر استعادة البيانات من Supabase: {e}")
+
+    # إعادة تحميل الكاش من قاعدة البيانات بعد الاستعادة لضمان توفر الألعاب فوراً
+    cache_clear()
+    get_all_games_af()
+    get_all_games_singular()
+    get_all_games_adj()
+    print("✅ تم تحميل الكاش من قاعدة البيانات")
 
     app = Application.builder().token(BOT_TOKEN).build()
 

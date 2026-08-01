@@ -251,6 +251,46 @@ def sync_dynamic_area_event_af(event_id, game_id, area_number):
          ["id"])
 
 
+# ==================== حذف الألعاب/الأحداث من Supabase ====================
+# تُزامن عمليات الحذف من SQLite إلى Supabase حتى لا تُستعاد الألعاب/الأحداث
+# المحذوفة بعد إعادة تشغيل البوت عبر restore_all().
+
+def sync_game_af_delete(game_id):
+    _run(_delete, "games_af", ["id"], [game_id])
+
+
+def sync_game_adj_delete(game_id):
+    _run(_delete, "games_adj", ["id"], [game_id])
+
+
+def sync_game_singular_delete(game_id):
+    _run(_delete, "games_singular", ["id"], [game_id])
+
+
+def sync_event_af_delete(event_id):
+    _run(_delete, "events_af", ["id"], [event_id])
+
+
+def sync_event_adj_delete(event_id):
+    _run(_delete, "events_adj", ["id"], [event_id])
+
+
+def sync_event_singular_delete(event_id):
+    _run(_delete, "events_singular", ["id"], [event_id])
+
+
+def sync_events_af_by_game_delete(game_id):
+    _run(_delete, "events_af", ["game_id"], [game_id])
+
+
+def sync_events_adj_by_game_delete(game_id):
+    _run(_delete, "events_adj", ["game_id"], [game_id])
+
+
+def sync_events_singular_by_game_delete(game_id):
+    _run(_delete, "events_singular", ["game_id"], [game_id])
+
+
 # ==================== مجموعات الجدولة ====================
 
 def sync_sched_group(group_row: dict):
@@ -286,7 +326,8 @@ def restore_all(sqlite_conn):
     """
     يستعيد كل البيانات من Supabase إلى SQLite المحلي عند الإقلاع.
     يُستدعى بشكل متزامن قبل بدء البوت لضمان توفر البيانات.
-    لا يمسح البيانات المحلية الموجودة — يستخدم INSERT OR IGNORE.
+    لا يمسح البيانات المحلية الموجودة — يدمج البيانات باستخدام INSERT OR REPLACE
+    للألعاب والأحداث (UPSERT) و INSERT OR IGNORE لباقي الجداول.
     """
     if not _enabled:
         logger.info("[Supabase Sync] المزامنة معطلة - تخطي استعادة البيانات")
@@ -323,7 +364,7 @@ def restore_all(sqlite_conn):
     rows = _fetch_all("games_af", ["id", "name", "display_name", "package", "dev_key", "emoji"])
     for r in rows:
         cur.execute(
-            "INSERT OR IGNORE INTO games_af (id, name, display_name, package, dev_key, emoji) VALUES (?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO games_af (id, name, display_name, package, dev_key, emoji) VALUES (?,?,?,?,?,?)",
             r
         )
     restored += len(rows)
@@ -332,7 +373,7 @@ def restore_all(sqlite_conn):
     rows = _fetch_all("games_singular", ["id", "name", "display_name", "package", "app_key", "emoji"])
     for r in rows:
         cur.execute(
-            "INSERT OR IGNORE INTO games_singular (id, name, display_name, package, app_key, emoji) VALUES (?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO games_singular (id, name, display_name, package, app_key, emoji) VALUES (?,?,?,?,?,?)",
             r
         )
     restored += len(rows)
@@ -341,7 +382,7 @@ def restore_all(sqlite_conn):
     rows = _fetch_all("games_adj", ["id", "name", "display_name", "app_token", "emoji"])
     for r in rows:
         cur.execute(
-            "INSERT OR IGNORE INTO games_adj (id, name, display_name, app_token, emoji) VALUES (?,?,?,?,?)",
+            "INSERT OR REPLACE INTO games_adj (id, name, display_name, app_token, emoji) VALUES (?,?,?,?,?)",
             r
         )
     restored += len(rows)
@@ -350,7 +391,7 @@ def restore_all(sqlite_conn):
     rows = _fetch_all("events_af", ["id", "game_id", "event_name", "display_name", "event_type", "is_purchase", "custom_event_value"])
     for r in rows:
         cur.execute(
-            "INSERT OR IGNORE INTO events_af (id, game_id, event_name, display_name, event_type, is_purchase, custom_event_value) VALUES (?,?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO events_af (id, game_id, event_name, display_name, event_type, is_purchase, custom_event_value) VALUES (?,?,?,?,?,?,?)",
             r
         )
     restored += len(rows)
@@ -359,7 +400,7 @@ def restore_all(sqlite_conn):
     rows = _fetch_all("events_singular", ["id", "game_id", "event_name", "display_name", "event_type"])
     for r in rows:
         cur.execute(
-            "INSERT OR IGNORE INTO events_singular (id, game_id, event_name, display_name, event_type) VALUES (?,?,?,?,?)",
+            "INSERT OR REPLACE INTO events_singular (id, game_id, event_name, display_name, event_type) VALUES (?,?,?,?,?)",
             r
         )
     restored += len(rows)
@@ -368,7 +409,7 @@ def restore_all(sqlite_conn):
     rows = _fetch_all("events_adj", ["id", "game_id", "event_name", "event_token", "display_name", "level_value"])
     for r in rows:
         cur.execute(
-            "INSERT OR IGNORE INTO events_adj (id, game_id, event_name, event_token, display_name, level_value) VALUES (?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO events_adj (id, game_id, event_name, event_token, display_name, level_value) VALUES (?,?,?,?,?,?)",
             r
         )
     restored += len(rows)
