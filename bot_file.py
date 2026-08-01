@@ -427,6 +427,7 @@ AF_GAMES = [
     ("cook_and_merge", "🍳 Cook & Merge", "com.supersolid.cookandmerge", "MwuH4qacNh9VfTrTBZVjMJ", "🍳"),
     ("match_factory", "🏭 Match Factory", "net.peakgames.match", "F9M4SkdtH8WHcAt86ESrF3", "🏭"),
     ("phase_10", "🎴 Phase 10", "com.mattel163.phase10", "qCWrc7L2pa8SbLEvonfmja", "🎴"),
+    ("magic_jigsaw_puzzles", "🧩 Magic Jigsaw Puzzles", "com.bandagames.mpuzzle.gp", "mFsPncjyX7jmZ6GB3yNptX", "🧩"),
 ]
 
 for game in AF_GAMES:
@@ -614,6 +615,21 @@ def add_af_events():
     if p10:
         c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase) VALUES (?, ?, ?, ?, ?)",
                        (p10[0], "af_finish_phase", "🎴 Finish Phase", "phase", 0))
+
+    # Magic Jigsaw Puzzles (com.bandagames.mpuzzle.gp)
+    # af_level_achieved يقبل رقماً مخصصاً من المستخدم (custom_event_value فارغ افتراضياً)
+    mjp = c_main.execute("SELECT id FROM games_af WHERE name = 'magic_jigsaw_puzzles'").fetchone()
+    if mjp:
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase, custom_event_value) VALUES (?, ?, ?, ?, ?, ?)",
+                       (mjp[0], "first_puzzle_solved", "🧩 First Puzzle Solved", "puzzle", 0, None))
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase, custom_event_value) VALUES (?, ?, ?, ?, ?, ?)",
+                       (mjp[0], "puzzle_complete", "✅ Puzzle Complete", "puzzle", 0, None))
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase, custom_event_value) VALUES (?, ?, ?, ?, ?, ?)",
+                       (mjp[0], "af_level_achieved", "🏆 Level Achieved", "level", 0, None))
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase, custom_event_value) VALUES (?, ?, ?, ?, ?, ?)",
+                       (mjp[0], "Ad_Watched", "📺 Ad Watched", "ad", 0, None))
+        c_main.execute("INSERT OR IGNORE INTO events_af (game_id, event_name, display_name, event_type, is_purchase, custom_event_value) VALUES (?, ?, ?, ?, ?, ?)",
+                       (mjp[0], "adrevenue_generic", "💰 Ad Revenue", "adrevenue", 0, None))
 
 add_af_events()
 
@@ -3911,6 +3927,12 @@ async def af_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status, resp = send_af(pkg, dev_key, gaid, af_uid, event, float(amount), proxy, platform, idfa, idfv)
     elif data.startswith("af_send_"):
         event = data.replace("af_send_", "")
+        # af_level_achieved يقبل رقماً مخصصاً من المستخدم (يُترك فارغاً افتراضياً)
+        # يُمرّر الرقم كقيمة af_level داخل eventValue دون تغيير اسم الحدث
+        if event == "af_level_achieved":
+            context.user_data["af_custom_event"] = event
+            await af_custom(update, context)
+            return "AF_CUSTOM"
         await query.edit_message_text("📤 *جاري الإرسال...*", parse_mode="Markdown")
         custom_ev_value = None
         af_game_id = context.user_data.get("af_game_id")
@@ -3951,6 +3973,9 @@ async def af_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def af_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    # عند الدخول من زر "✨ لفل مخصص" العام، نمسح أي حدث محدد مسبقاً
+    # حتى يعمل المسار الافتراضي (af_level_{X}_achieved)
+    context.user_data.pop("af_custom_event", None)
     await query.edit_message_text(
         "✨ *لفل مخصص*\n\n"
         "أدخل رقم اللفل المطلوب (مثال: 45 أو 46):",
@@ -4017,19 +4042,27 @@ async def af_custom_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         idfv = None
     # بناء اسم الحدث الحقيقي للعبة مع استبدال رقم اللفل بالرقم المُدخل
     # بنفس الطريقة الأساسية تماماً
-    game_id = context.user_data.get("af_game_id")
-    events = get_af_events(game_id, purchase_only=False) if game_id else []
-    if events:
-        base_event = events[0][1]  # اسم أول حدث غير شرائي للعبة
-        if re.search(r'\d+', base_event):
-            # استبدل كل الأرقام في اسم الحدث بالرقم المُدخل
-            event = re.sub(r'\d+', custom_level, base_event)
+    selected_event = context.user_data.pop("af_custom_event", None)
+    # إذا تم تحديد حدث بعينه (مثل af_level_achieved) نُرسل الرقم كقيمة af_level
+    # داخل eventValue دون تغيير اسم الحدث
+    if selected_event:
+        event = selected_event
+        custom_level_val = custom_level
+    else:
+        custom_level_val = None
+        game_id = context.user_data.get("af_game_id")
+        events = get_af_events(game_id, purchase_only=False) if game_id else []
+        if events:
+            base_event = events[0][1]  # اسم أول حدث غير شرائي للعبة
+            if re.search(r'\d+', base_event):
+                # استبدل كل الأرقام في اسم الحدث بالرقم المُدخل
+                event = re.sub(r'\d+', custom_level, base_event)
+            else:
+                event = f"af_level_{custom_level}_achieved"
         else:
             event = f"af_level_{custom_level}_achieved"
-    else:
-        event = f"af_level_{custom_level}_achieved"
     await query.edit_message_text("📤 *جاري الإرسال...*", parse_mode="Markdown")
-    status, resp = send_af(pkg, dev_key, gaid, af_uid, event, None, proxy, platform, idfa, idfv)
+    status, resp = send_af(pkg, dev_key, gaid, af_uid, event, None, proxy, platform, idfa, idfv, custom_level=custom_level_val)
     increment_user_requests(uid)
     if status == 200:
         result = "✅ *تم الإرسال بنجاح!*"

@@ -222,3 +222,38 @@ CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
 CREATE INDEX IF NOT EXISTS idx_credential_files_lookup ON credential_files(user_id, platform, game_id);
 CREATE INDEX IF NOT EXISTS idx_sched_groups_user ON sched_groups(user_id);
 CREATE INDEX IF NOT EXISTS idx_sched_groups_status ON sched_groups(status);
+
+-- ==================================================================================
+-- Magic Jigsaw Puzzles (com.bandagames.mpuzzle.gp)
+-- ==================================================================================
+-- لعبة جديدة مع 5 أحداث AppsFlyer:
+-- first_puzzle_solved : أول لغز يُحل
+-- puzzle_complete     : إكمال أي لغز
+-- af_level_achieved   : بلوغ لفل جديد (يقبل رقماً مخصصاً من المستخدم عبر custom_event_value فارغ)
+-- Ad_Watched          : مشاهدة إعلان حتى النهاية
+-- adrevenue_generic   : تسجيل إيرادات الإعلانات
+-- الـ id ثابت (9001/91001-91005) لضمان استعادته بعد إعادة النشر عبر INSERT OR IGNORE.
+-- ==================================================================================
+
+INSERT INTO games_af (id, name, display_name, package, dev_key, emoji)
+VALUES (9001, 'magic_jigsaw_puzzles', '🧩 Magic Jigsaw Puzzles', 'com.bandagames.mpuzzle.gp', 'mFsPncjyX7jmZ6GB3yNptX', '🧩')
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    display_name = EXCLUDED.display_name,
+    package = EXCLUDED.package,
+    dev_key = EXCLUDED.dev_key,
+    emoji = EXCLUDED.emoji;
+
+INSERT INTO events_af (id, game_id, event_name, display_name, event_type, is_purchase, custom_event_value) VALUES
+    (91001, 9001, 'first_puzzle_solved', '🧩 First Puzzle Solved', 'puzzle', 0, NULL),
+    (91002, 9001, 'puzzle_complete', '✅ Puzzle Complete', 'puzzle', 0, NULL),
+    (91003, 9001, 'af_level_achieved', '🏆 Level Achieved', 'level', 0, NULL),
+    (91004, 9001, 'Ad_Watched', '📺 Ad Watched', 'ad', 0, NULL),
+    (91005, 9001, 'adrevenue_generic', '💰 Ad Revenue', 'adrevenue', 0, NULL)
+ON CONFLICT (id) DO UPDATE SET
+    game_id = EXCLUDED.game_id,
+    event_name = EXCLUDED.event_name,
+    display_name = EXCLUDED.display_name,
+    event_type = EXCLUDED.event_type,
+    is_purchase = EXCLUDED.is_purchase,
+    custom_event_value = EXCLUDED.custom_event_value;
