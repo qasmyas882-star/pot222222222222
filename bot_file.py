@@ -428,6 +428,9 @@ AF_GAMES = [
     ("match_factory", "🏭 Match Factory", "net.peakgames.match", "F9M4SkdtH8WHcAt86ESrF3", "🏭"),
     ("phase_10", "🎴 Phase 10", "com.mattel163.phase10", "qCWrc7L2pa8SbLEvonfmja", "🎴"),
     ("magic_jigsaw_puzzles", "🧩 Magic Jigsaw Puzzles", "com.bandagames.mpuzzle.gp", "mFsPncjyX7jmZ6GB3yNptX", "🧩"),
+    ("merge_studio", "merge studio", "com.paxiegames.mergestudio", "mFaiXvTWy8votzp3UpsSfS", "🍳"),
+    ("matching_story", "matching story", "com.joycastle.mergematch", "v2w2tuNCNaBNXvFJgRGPRW", "🍳"),
+    ("Fable_Town", "Fable Town", "com.reefgames.fabletown", "SkFuXyWX5DroPdHMwH8pNZ", "🍳"),
 ]
 
 for game in AF_GAMES:
